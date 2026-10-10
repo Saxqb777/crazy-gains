@@ -34,9 +34,15 @@ export async function bumpGeneration(startedBy: string): Promise<number> {
   return (rows[0].value as LoopLease).generation;
 }
 
-// Stale when the last tick is older than its own planned sleep plus 3 minutes.
+// Stale when neither a tick nor a fresh start happened within the last planned
+// sleep plus 3 minutes. Counting startedAt stops a just-started loop from being
+// restarted again before its first tick lands.
 export function isStale(lease: LoopLease | null, now = Date.now()) {
-  if (!lease?.lastTickAt) return true;
+  if (!lease) return true;
+  const last = Math.max(
+    lease.lastTickAt ? Date.parse(lease.lastTickAt) : 0,
+    lease.startedAt ? Date.parse(lease.startedAt) : 0,
+  );
   const graceMs = ((lease.lastSleepSec ?? 600) + 180) * 1000;
-  return now - Date.parse(lease.lastTickAt) > graceMs;
+  return now - last > graceMs;
 }
